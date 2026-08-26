@@ -130,8 +130,10 @@ function drawClinicHeader(doc: jsPDF, c: ReceitaClinica) {
       const fmt = /image\/jpe?g/.test(c.logoUrl) ? "JPEG" : "PNG";
       doc.addImage(c.logoUrl, fmt, M, 12, 24, 24, undefined, "FAST");
       textX = M + 28;
-    } catch {
-      // logo invalida: emite a receita sem ela
+    } catch (err) {
+      // Logo invalida nao pode impedir a emissao da receita, mas some em silencio
+      // e o veterinario nunca descobre por que o cabecalho saiu sem ela.
+      console.error("Receita: logo da clinica nao pode ser desenhada", err);
     }
   }
 

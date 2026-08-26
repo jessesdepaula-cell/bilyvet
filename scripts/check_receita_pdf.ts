@@ -58,6 +58,19 @@ const muitos = montarReceitaPDF({
 });
 assert.ok(muitos.getNumberOfPages() > 1, "receita longa precisa paginar");
 
+// logo valida TEM que ser desenhada - o catch do addImage ja engoliu um erro
+// em silencio e o cabecalho saiu sem logo sem ninguem perceber
+const LOGO_OK = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAFElEQVR4nGMUqYhiwAaYsIoOWgkAuKYA9oPkEv4AAAAASUVORK5CYII=";
+const comLogo = montarReceitaPDF({
+  ...base,
+  clinic: { ...base.clinic, logoUrl: LOGO_OK },
+  items: [{ medication: "Alergovet", dosage: "1,4mg" }],
+});
+assert.ok(
+  Buffer.from(comLogo.output("arraybuffer")).toString("latin1").includes("/Subtype /Image"),
+  "logo valida precisa virar imagem no PDF"
+);
+
 // logo invalida nao pode derrubar a emissao
 const comLogoQuebrada = montarReceitaPDF({
   ...base,
@@ -65,6 +78,10 @@ const comLogoQuebrada = montarReceitaPDF({
   items: [{ medication: "Alergovet", dosage: "1,4mg" }],
 });
 assert.strictEqual(comLogoQuebrada.getNumberOfPages(), 1);
+assert.ok(
+  !Buffer.from(comLogoQuebrada.output("arraybuffer")).toString("latin1").includes("/Subtype /Image"),
+  "sem imagem quando a logo e invalida - prova que o assert acima tem valor"
+);
 
 // retorno tambem e data-pura: 11/08 tem que sair 11/08, nao 10/08
 const texto = Buffer.from(um.output("arraybuffer")).toString("latin1");
