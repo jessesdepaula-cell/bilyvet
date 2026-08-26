@@ -36,6 +36,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     data.unitId = b.unitId || null;
   }
   if (b.isActive !== undefined) data.isActive = !!b.isActive;
+  if (b.crmv !== undefined) data.crmv = String(b.crmv ?? "").trim() || null;
   if (b.permissions !== undefined) {
     // null/[] = usar padrao do role; array com slugs = override
     if (b.permissions === null) {

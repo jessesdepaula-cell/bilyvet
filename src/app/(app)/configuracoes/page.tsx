@@ -8,22 +8,31 @@ import { SupplierManager } from "./SupplierManager";
 import { CollaboratorsManager } from "./CollaboratorsManager";
 import { ProtocolTemplateManager } from "./ProtocolTemplateManager";
 import { AppointmentStatusManager } from "./AppointmentStatusManager";
+import { ClinicIdentity } from "./ClinicIdentity";
 
 export const dynamic = "force-dynamic";
 
 export default async function ConfiguracoesPage({ searchParams }: { searchParams: { tab?: string } }) {
   const { tenantId } = await requireModule("configuracoes");
-  const activeTab = searchParams.tab || "servicos";
+  const activeTab = searchParams.tab || "clinica";
 
-  const [services, methods, machines, categories, suppliers] = await Promise.all([
+  const [services, methods, machines, categories, suppliers, tenant] = await Promise.all([
     prisma.service.findMany({ where: { tenantId }, orderBy: { name: "asc" } }),
     prisma.paymentMethod.findMany({ where: { tenantId }, orderBy: { name: "asc" } }),
     prisma.cardMachine.findMany({ where: { tenantId } }),
     prisma.productCategory.findMany({ where: { tenantId }, orderBy: { name: "asc" } }),
     prisma.supplier.findMany({ where: { tenantId, isActive: true }, orderBy: { name: "asc" } }),
+    prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        companyName: true, tradeName: true, cnpj: true, email: true, phone: true,
+        address: true, city: true, state: true, zipCode: true, logoUrl: true,
+      },
+    }),
   ]);
 
   const tabs = [
+    { id: "clinica", label: "Clinica & Receita" },
     { id: "servicos", label: "Servicos & Status" },
     { id: "colaboradores", label: "Colaboradores" },
     { id: "protocolos", label: "Modelos de Protocolos" },
@@ -60,6 +69,12 @@ export default async function ConfiguracoesPage({ searchParams }: { searchParams
 
       {/* Tab Contents */}
       <div className="space-y-6">
+        {activeTab === "clinica" && tenant && (
+          <div className="max-w-3xl">
+            <ClinicIdentity initial={tenant} />
+          </div>
+        )}
+
         {activeTab === "servicos" && (
           <div className="grid lg:grid-cols-3 gap-5">
             <div className="card card-pad lg:col-span-2">

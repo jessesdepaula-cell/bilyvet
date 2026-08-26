@@ -14,6 +14,7 @@ type User = {
   isActive: boolean;
   unitId: string | null;
   unit?: { id: string; name: string } | null;
+  crmv: string | null;
   permissions: string[] | null;
 };
 
@@ -30,20 +31,21 @@ export function UsersManager({ initial, units, currentUserId }: { initial: User[
     email: "",
     role: "RECEPCAO" as Role,
     unitId: units[0]?.id || "",
+    crmv: "",
     permissions: defaultPermissionsForRole("RECEPCAO"),
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ email: string; link?: string; emailSent: boolean } | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
-  const [editDraft, setEditDraft] = useState<{ role: string; unitId: string; permissions: string[] }>({ role: "", unitId: "", permissions: [] });
+  const [editDraft, setEditDraft] = useState<{ role: string; unitId: string; crmv: string; permissions: string[] }>({ role: "", unitId: "", crmv: "", permissions: [] });
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   function startCreate() {
     setCreating(true);
     setResult(null);
     setShowAdvanced(false);
-    setDraft({ name: "", email: "", role: "RECEPCAO", unitId: units[0]?.id || "", permissions: defaultPermissionsForRole("RECEPCAO") });
+    setDraft({ name: "", email: "", role: "RECEPCAO", unitId: units[0]?.id || "", crmv: "", permissions: defaultPermissionsForRole("RECEPCAO") });
   }
 
   function changeRoleInDraft(role: Role) {
@@ -61,6 +63,7 @@ export function UsersManager({ initial, units, currentUserId }: { initial: User[
         email: draft.email,
         role: draft.role,
         unitId: draft.unitId,
+        crmv: draft.crmv,
         permissions: isCustom ? draft.permissions : null,
       };
       const res = await fetch("/api/users", {
@@ -72,7 +75,7 @@ export function UsersManager({ initial, units, currentUserId }: { initial: User[
       if (!res.ok) throw new Error(j.error || "Falha ao criar usuario");
       const newUser: User = {
         id: j.user.id, name: j.user.name, email: j.user.email, role: j.user.role,
-        isActive: j.user.isActive, unitId: j.user.unitId,
+        isActive: j.user.isActive, unitId: j.user.unitId, crmv: j.user.crmv ?? null,
         unit: units.find((u) => u.id === j.user.unitId) ?? null,
         permissions: isCustom ? draft.permissions : null,
       };
@@ -113,7 +116,7 @@ export function UsersManager({ initial, units, currentUserId }: { initial: User[
   function startEdit(u: User) {
     setEditId(u.id);
     const eff = effectivePermissions(u.role, u.permissions);
-    setEditDraft({ role: u.role, unitId: u.unitId || "", permissions: [...eff] });
+    setEditDraft({ role: u.role, unitId: u.unitId || "", crmv: u.crmv ?? "", permissions: [...eff] });
   }
 
   async function saveEdit(id: string, u: User) {
@@ -124,6 +127,7 @@ export function UsersManager({ initial, units, currentUserId }: { initial: User[
       const payload = {
         role: editDraft.role,
         unitId: editDraft.unitId || null,
+        crmv: editDraft.crmv,
         permissions: isCustom ? editDraft.permissions : null,
       };
       const res = await fetch(`/api/users/${id}`, {
@@ -134,7 +138,7 @@ export function UsersManager({ initial, units, currentUserId }: { initial: User[
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || "Falha");
       setUsers((arr) => arr.map((x) => (x.id === id ? {
-        ...x, role: j.role, unitId: j.unitId,
+        ...x, role: j.role, unitId: j.unitId, crmv: j.crmv ?? null,
         unit: units.find((un) => un.id === j.unitId) ?? null,
         permissions: isCustom ? editDraft.permissions : null,
       } : x)));
@@ -213,6 +217,11 @@ export function UsersManager({ initial, units, currentUserId }: { initial: User[
                 {units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             </div>
+            <div className="sm:col-span-2">
+              <label className="label">CRMV</label>
+              <input className="input" value={draft.crmv} onChange={(e) => setDraft({ ...draft, crmv: e.target.value })} placeholder="Ex: RJ 17.412" />
+              <p className="text-xs text-slate-500 mt-1">Usado na assinatura das receitas emitidas por este veterinario.</p>
+            </div>
           </div>
 
           <div className="border-t border-amber-200 pt-3">
@@ -248,7 +257,7 @@ export function UsersManager({ initial, units, currentUserId }: { initial: User[
 
       <div className="card overflow-hidden">
         <table className="bp-table">
-          <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Unidade</th><th>Permissoes</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>CRMV</th><th>Unidade</th><th>Permissoes</th><th>Status</th><th></th></tr></thead>
           <tbody>{users.map((u) => {
             const editing = editId === u.id;
             const eff = effectivePermissions(u.role, u.permissions);
@@ -268,6 +277,13 @@ export function UsersManager({ initial, units, currentUserId }: { initial: User[
                       </select>
                     ) : (
                       <span className="badge-blue">{ROLE_LABEL[u.role as Role] ?? u.role}</span>
+                    )}
+                  </td>
+                  <td className="text-xs text-slate-600">
+                    {editing ? (
+                      <input className="input text-xs" value={editDraft.crmv} placeholder="RJ 17.412" onChange={(e) => setEditDraft({ ...editDraft, crmv: e.target.value })} />
+                    ) : (
+                      u.crmv || "-"
                     )}
                   </td>
                   <td>
@@ -306,7 +322,7 @@ export function UsersManager({ initial, units, currentUserId }: { initial: User[
                 </tr>
                 {editing && (
                   <tr key={u.id + "-perms"}>
-                    <td colSpan={7} className="bg-amber-50/50 border-t-0">
+                    <td colSpan={8} className="bg-amber-50/50 border-t-0">
                       <div className="py-3">
                         <PermissionsMatrix
                           role={editDraft.role}

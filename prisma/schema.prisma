@@ -46,6 +46,7 @@ model User {
   email        String   @unique
   passwordHash String
   role         String // SUPER_ADMIN | ADMIN | GESTOR | VETERINARIO | RECEPCAO | FINANCEIRO | ESTOQUE | BANHO_TOSA | VENDEDOR
+  crmv         String? // CRMV do veterinario - assina a receita
   permissions  String? // JSON array de slugs de modulo liberados. Null = usar padrao do role.
   isActive     Boolean  @default(true)
   unitId       String?
@@ -82,6 +83,7 @@ model Tenant {
   city            String?
   state           String?
   zipCode         String?
+  logoUrl         String? // data URI (base64) da logo da clinica - aparece no cabecalho da receita
   status          String    @default("TRIAL") // TRIAL, ACTIVE, PAST_DUE, SUSPENDED, CANCELED
   asaasCustomerId String?   @unique
   notes           String?

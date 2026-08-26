@@ -72,6 +72,7 @@ export async function POST(req: Request) {
       email,
       role,
       passwordHash: placeholderHash,
+      crmv: String(b.crmv || "").trim() || null,
       isActive: true,
       permissions: customPermissions ? JSON.stringify(customPermissions) : null,
     },
@@ -94,7 +95,7 @@ export async function POST(req: Request) {
   await prisma.auditLog.create({ data: { tenantId: ctx.tenantId, userId: ctx.session.id, action: "CREATE", entity: "User", entityId: user.id, details: `${email} (${role})` } });
 
   return NextResponse.json({
-    user: { id: user.id, name: user.name, email: user.email, role: user.role, unitId: user.unitId, isActive: user.isActive },
+    user: { id: user.id, name: user.name, email: user.email, role: user.role, unitId: user.unitId, crmv: user.crmv, isActive: user.isActive },
     invite: {
       link,
       emailSent: sendResult.ok,

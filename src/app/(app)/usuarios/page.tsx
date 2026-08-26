@@ -22,6 +22,7 @@ export default async function UsuariosPage() {
           initial={users.map((u) => ({
             id: u.id, name: u.name, email: u.email, role: u.role, isActive: u.isActive,
             unitId: u.unitId, unit: u.unit ? { id: u.unit.id, name: u.unit.name } : null,
+            crmv: u.crmv,
             permissions: parsePermissions(u.permissions),
           }))}
           units={units.map((u) => ({ id: u.id, name: u.name }))}

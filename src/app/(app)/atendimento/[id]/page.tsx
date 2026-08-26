@@ -10,7 +10,7 @@ import { AtendimentoActions } from "./AtendimentoActions";
 export const dynamic = "force-dynamic";
 
 export default async function AtendimentoDetailPage({ params }: { params: { id: string } }) {
-  const { tenantId } = await requireModule("atendimento");
+  const { tenantId, session } = await requireModule("atendimento");
 
   const a = await prisma.appointment.findFirst({
     where: { id: params.id, unit: { tenantId } },
@@ -27,12 +27,26 @@ export default async function AtendimentoDetailPage({ params }: { params: { id: 
       },
       vet: true,
       services: { include: { service: true } },
-      medicalRecord: { include: { prescriptions: true } },
+      medicalRecord: { include: { prescriptions: true, vet: true } },
       collaborators: { include: { collaborator: true } },
     },
   });
 
   if (!a) return notFound();
+
+  // Cabecalho da receita: dados da clinica do assinante + quem assina
+  const [clinic, signer] = await Promise.all([
+    prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        companyName: true, tradeName: true, cnpj: true, phone: true,
+        address: true, city: true, state: true, zipCode: true, logoUrl: true,
+      },
+    }),
+    prisma.user.findUnique({ where: { id: session.id }, select: { name: true, crmv: true } }),
+  ]);
+
+  const vetAssinante = a.medicalRecord?.vet ?? a.vet ?? signer ?? { name: session.name, crmv: null };
 
   // Busca os status de agendamento do tenant
   let statuses = await prisma.appointmentStatus.findMany({
@@ -127,7 +141,38 @@ export default async function AtendimentoDetailPage({ params }: { params: { id: 
             </div>
           </div>
 
-          <MedicalRecordForm appointmentId={a.id} initial={a.medicalRecord ?? null} />
+          <MedicalRecordForm
+                appointmentId={a.id}
+                initial={a.medicalRecord ?? null}
+                clinic={{
+                  name: clinic?.tradeName || clinic?.companyName || "Clinica",
+                  address: clinic?.address ?? null,
+                  city: clinic?.city ?? null,
+                  state: clinic?.state ?? null,
+                  zipCode: clinic?.zipCode ?? null,
+                  phone: clinic?.phone ?? null,
+                  cnpj: clinic?.cnpj ?? null,
+                  logoUrl: clinic?.logoUrl ?? null,
+                }}
+                pet={a.pet ? {
+                  name: a.pet.name,
+                  species: a.pet.species,
+                  breed: a.pet.breed,
+                  sex: a.pet.sex,
+                  color: a.pet.color,
+                  microchip: a.pet.microchip,
+                  birthDate: a.pet.birthDate ? a.pet.birthDate.toISOString() : null,
+                  weightKg: a.pet.weightKg,
+                } : null}
+                tutor={{
+                  name: a.tutor.name,
+                  document: a.tutor.document,
+                  address: a.tutor.address,
+                  phone: a.tutor.phone,
+                }}
+                vet={{ name: vetAssinante.name, crmv: (vetAssinante as any).crmv ?? null }}
+                printedBy={session.name}
+              />
         </div>
 
         <div className="space-y-5">

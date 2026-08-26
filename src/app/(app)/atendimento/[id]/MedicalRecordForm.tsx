@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import jsPDF from "jspdf";
+import { gerarReceitaPDF, type ReceitaClinica, type ReceitaPaciente, type ReceitaTutor, type ReceitaVet } from "@/lib/receita-pdf";
 
 type Prescription = { medication: string; dosage: string; frequency: string; duration: string; guidelines?: string | null };
 type MR = {
@@ -14,7 +14,17 @@ type MR = {
   prescriptions?: Prescription[];
 };
 
-export function MedicalRecordForm({ appointmentId, initial }: { appointmentId: string; initial: any | null }) {
+type Props = {
+  appointmentId: string;
+  initial: any | null;
+  clinic: ReceitaClinica;
+  pet: ReceitaPaciente | null;
+  tutor: ReceitaTutor;
+  vet: ReceitaVet;
+  printedBy: string;
+};
+
+export function MedicalRecordForm({ appointmentId, initial, clinic, pet, tutor, vet, printedBy }: Props) {
   const router = useRouter();
   const [m, setM] = useState<MR>(initial ?? {});
   const [rx, setRx] = useState<Prescription[]>(initial?.prescriptions ?? [{ medication: "", dosage: "", frequency: "", duration: "" }]);
@@ -38,22 +48,20 @@ export function MedicalRecordForm({ appointmentId, initial }: { appointmentId: s
   }
 
   function pdf() {
-    const doc = new jsPDF();
-    doc.setFontSize(16); doc.text("BilyVet - Receituario", 14, 18);
-    doc.setFontSize(10); doc.text(`Data: ${new Date().toLocaleString("pt-BR")}`, 14, 26);
-    let y = 36;
-    doc.setFontSize(12); doc.text("Prescricao medica:", 14, y); y += 8;
-    doc.setFontSize(10);
-    rx.filter((r) => r.medication.trim()).forEach((r, i) => {
-      doc.text(`${i + 1}. ${r.medication} - ${r.dosage} - ${r.frequency} - ${r.duration}`, 14, y); y += 6;
-      if (r.guidelines) { doc.text(`   Orientacoes: ${r.guidelines}`, 14, y); y += 6; }
+    const itens = rx.filter((r) => r.medication.trim());
+    if (itens.length === 0) { setMsg("Adicione ao menos um medicamento antes de gerar a receita."); return; }
+    gerarReceitaPDF({
+      clinic,
+      pet: pet ?? { name: "-" },
+      tutor,
+      vet,
+      printedBy,
+      items: itens,
+      weightKg: m.weightKg ?? null,
+      // Conduta e observacoes viram o bloco de orientacoes gerais da receita
+      observations: [m.conduct, m.observations].map((v) => (v || "").trim()).filter(Boolean).join("\n"),
+      recommendReturn: m.recommendReturn ?? null,
     });
-    y += 6;
-    if (m.diagnosis) { doc.text(`Diagnostico: ${m.diagnosis}`, 14, y); y += 6; }
-    if (m.conduct) { doc.text(`Conduta: ${m.conduct}`, 14, y); y += 6; }
-    doc.text("____________________________", 14, y + 16);
-    doc.text("Medico Veterinario", 14, y + 22);
-    doc.save("receita-bilyvet.pdf");
   }
 
   return (
