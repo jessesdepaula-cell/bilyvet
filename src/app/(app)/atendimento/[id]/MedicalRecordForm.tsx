@@ -47,7 +47,20 @@ export function MedicalRecordForm({ appointmentId, initial, clinic, pet, tutor, 
     } catch (e: any) { setMsg(e.message); } finally { setSaving(false); }
   }
 
+  const faltaEndereco = !(clinic.address ?? "").trim();
+  const faltaLogo = !(clinic.logoUrl ?? "").trim();
+
   function pdf() {
+    // Receita sem identificacao da clinica nao serve como documento: o endereco
+    // e obrigatorio no cabecalho. Bloqueia aqui e diz onde resolver, em vez de
+    // emitir um PDF incompleto que o tutor so vai descobrir na farmacia.
+    if (faltaEndereco) {
+      setMsg(
+        "Cadastre o endereco da clinica em Configuracoes > Identidade da clinica para gerar a receita. " +
+          "Ele aparece no cabecalho do documento."
+      );
+      return;
+    }
     const itens = rx.filter((r) => r.medication.trim());
     if (itens.length === 0) { setMsg("Adicione ao menos um medicamento antes de gerar a receita."); return; }
     gerarReceitaPDF({
@@ -98,10 +111,35 @@ export function MedicalRecordForm({ appointmentId, initial, clinic, pet, tutor, 
         </div>
       </div>
 
-      {msg && <div className="text-sm text-emerald-700">{msg}</div>}
+      {(faltaEndereco || faltaLogo) && (
+        <div className={`text-sm rounded-xl px-3 py-2 border ${faltaEndereco ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-slate-50 border-slate-200 text-slate-600"}`}>
+          {faltaEndereco ? (
+            <>
+              <strong>Falta o endereco da clinica para emitir receita.</strong> Ele entra no cabecalho do
+              documento. Preencha em{" "}
+              <a href="/configuracoes" className="underline font-medium">Configuracoes &gt; Identidade da clinica</a>.
+            </>
+          ) : (
+            <>
+              A receita vai sair sem logo. Envie a imagem em{" "}
+              <a href="/configuracoes" className="underline font-medium">Configuracoes &gt; Identidade da clinica</a>{" "}
+              se quiser o cabecalho completo.
+            </>
+          )}
+        </div>
+      )}
+
+      {msg && <div className={`text-sm ${faltaEndereco ? "text-amber-700" : "text-emerald-700"}`}>{msg}</div>}
       <div className="flex gap-2">
         <button onClick={save} disabled={saving} className="btn-primary">{saving ? "Salvando..." : "Salvar ficha"}</button>
-        <button onClick={pdf} type="button" className="btn-outline">Gerar receita (PDF)</button>
+        <button
+          onClick={pdf}
+          type="button"
+          className="btn-outline"
+          title={faltaEndereco ? "Cadastre o endereco da clinica para liberar a receita" : undefined}
+        >
+          Gerar receita (PDF)
+        </button>
       </div>
     </div>
   );
