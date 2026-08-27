@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireTenantApi, isTenantError } from "@/lib/tenant";
+import { PAPEIS_DE_OPERADOR } from "@/lib/whatsapp/operator-roles";
 
 export async function GET() {
   const ctx = await requireTenantApi();
@@ -11,8 +12,10 @@ export async function GET() {
   const { tenantId } = ctx;
 
   try {
+    // So papel de operador: contatos criados de raspao pelo cache de foto de
+    // perfil (role "CLIENTE") nao sao operadores e nao entram nesta lista.
     const contacts = await prisma.whatsappContact.findMany({
-      where: { tenantId },
+      where: { tenantId, role: { in: [...PAPEIS_DE_OPERADOR] } },
       orderBy: { createdAt: "desc" },
     });
 

@@ -172,6 +172,11 @@ export async function GET(req: Request) {
                   data: { profilePicUrl },
                 }).catch(() => {});
               } else {
+                // ATENCAO: este upsert existe SO para cachear a foto de perfil.
+                // O papel tem que continuar fora de PAPEIS_DE_OPERADOR - a mesma
+                // tabela autoriza quem alimenta o sistema pela IA, e usar um papel
+                // de operador aqui transformaria em operador todo mundo que trocou
+                // mensagem com a clinica (foi o que aconteceu na VETZ em 07/2026).
                 await prisma.whatsappContact.upsert({
                   where: { tenantId_phone: { tenantId, phone: c.phone } },
                   create: {

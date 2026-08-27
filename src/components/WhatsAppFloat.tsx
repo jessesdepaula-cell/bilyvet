@@ -1,7 +1,26 @@
+"use client";
+
+import { usePathname } from "next/navigation";
+
 const WHATSAPP_NUMBER = "5521997267809";
 const WHATSAPP_MESSAGE = "Ola! Vim pelo sistema BilyVet e preciso de suporte.";
 
+/**
+ * Rotas onde o botao de suporte aparece. E uma LISTA BRANCA de propósito: a area
+ * logada vive no route group `(app)`, que nao aparece na URL, entao nao da para
+ * detectar "e pagina do app" por prefixo - as rotas internas sao dezenas
+ * (/dashboard, /pets, /agenda, /configuracoes...) e qualquer nova escaparia de
+ * uma lista negra. As publicas, ao contrario, sao poucas e estaveis.
+ */
+const ROTAS_PUBLICAS = ["/", "/checkout", "/login", "/recuperar-senha", "/redefinir-senha"];
+
 export default function WhatsAppFloat() {
+  const pathname = usePathname();
+  const ehPublica = ROTAS_PUBLICAS.some((r) => pathname === r || pathname.startsWith(`${r}/`));
+  // Dentro da area de membros o cliente fala com a clinica pelo proprio sistema;
+  // este botao e de suporte comercial e so faz sentido antes do login.
+  if (!ehPublica) return null;
+
   const href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`;
 
   return (

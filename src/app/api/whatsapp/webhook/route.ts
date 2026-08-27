@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { PAPEIS_DE_OPERADOR } from "@/lib/whatsapp/operator-roles";
 import { getBase64FromMediaMessage, sendText } from "@/lib/whatsapp/evolution";
 import { transcribeAudio, getOpenAiApiKey } from "@/lib/whatsapp/openai";
 import { runAgent } from "@/lib/whatsapp/ai/engine";
@@ -119,9 +120,17 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true, outgoingSaved: outgoingMsg.id });
       }
 
-      // Verifica se o numero e de um operador cadastrado
+      // Verifica se o numero e de um operador cadastrado.
+      // Filtra por PAPEL: `WhatsappContact` tambem guarda contato comum (a rota de
+      // mensagens cria um so para cachear foto de perfil), e sem esse filtro
+      // qualquer tutor que trocou mensagem virava operador da clinica.
       const operatorContact = await prisma.whatsappContact.findFirst({
-        where: { tenantId, phone: fromPhone, active: true },
+        where: {
+          tenantId,
+          phone: fromPhone,
+          active: true,
+          role: { in: [...PAPEIS_DE_OPERADOR] },
+        },
       });
 
       const mode = operatorContact ? "OPERATOR" : "CLIENT";
