@@ -88,8 +88,14 @@ export async function POST(req: Request) {
           const paidAt = payment.paymentDate ? new Date(payment.paymentDate) : null;
           if (sub && sub.asaasSubscriptionId && paidAt && !Number.isNaN(paidAt.getTime())) {
             const newDueDate = nextDueDateFromPayment(paidAt);
+            // IDEMPOTENCIA: o Asaas reenvia evento (retry, reprocessamento), e com
+            // updatePendingPayments ele GERA cobranca nova em vez de mover a
+            // existente. Sem esta guarda, cada reenvio duplicaria a mensalidade.
+            const dueDateLocal = sub.nextDueDate
+              ? sub.nextDueDate.toISOString().slice(0, 10)
+              : null;
             try {
-              if (asaasIsConfigured()) {
+              if (asaasIsConfigured() && dueDateLocal !== newDueDate) {
                 await updateSubscription(sub.asaasSubscriptionId, {
                   nextDueDate: newDueDate,
                   updatePendingPayments: true,

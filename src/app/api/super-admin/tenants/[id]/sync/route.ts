@@ -66,10 +66,17 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       const lastPaid = paidPayments[0];
       if (lastPaid?.paymentDate) {
         const newDueDate = nextDueDateFromPayment(new Date(lastPaid.paymentDate));
-        try {
-          await updateSubscription(sub.asaasSubscriptionId, { nextDueDate: newDueDate, updatePendingPayments: true });
-        } catch {
-          // se o Asaas recusar, mantem ao menos o valor local coerente
+        // IDEMPOTENCIA: so mexe no Asaas se a data mudou de verdade. Com
+        // updatePendingPayments o Asaas GERA uma cobranca nova em vez de mover a
+        // existente, entao chamar isso a cada sync duplicava a mensalidade do
+        // cliente - uma cobranca extra por execucao (aconteceu na VETZ em 26/08/2026,
+        // 2 cobrancas para 04/09 e 2 para 04/10).
+        if (remote.nextDueDate !== newDueDate) {
+          try {
+            await updateSubscription(sub.asaasSubscriptionId, { nextDueDate: newDueDate, updatePendingPayments: true });
+          } catch {
+            // se o Asaas recusar, mantem ao menos o valor local coerente
+          }
         }
         await prisma.subscription.update({
           where: { id: sub.id },
