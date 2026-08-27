@@ -147,11 +147,11 @@ export function ClinicIdentity({ initial }: { initial: Clinic }) {
           <input className="input" value={c.cnpj ?? ""} onChange={(e) => u("cnpj", e.target.value)} placeholder="00.000.000/0001-00" />
         </div>
         <div>
-          <label className="label">Telefone</label>
+          <label className="label">Telefone * <span className="text-slate-400 font-normal">(exigido na receita)</span></label>
           <input className="input" value={c.phone ?? ""} onChange={(e) => u("phone", e.target.value)} placeholder="(21) 98186-1032" />
         </div>
         <div className="sm:col-span-2">
-          <label className="label">Endereco</label>
+          <label className="label">Endereco * <span className="text-slate-400 font-normal">(exigido na receita)</span></label>
           <input className="input" value={c.address ?? ""} onChange={(e) => u("address", e.target.value)} placeholder="Estrada Cachamorra 350, bloco 3, loja 133" />
         </div>
         <div>

@@ -47,17 +47,27 @@ export function MedicalRecordForm({ appointmentId, initial, clinic, pet, tutor, 
     } catch (e: any) { setMsg(e.message); } finally { setSaving(false); }
   }
 
-  const faltaEndereco = !(clinic.address ?? "").trim();
+  // Endereco e telefone identificam a clinica no cabecalho: sem eles a receita
+  // nao serve como documento. Sao pedidos JUNTOS, para o veterinario nao voltar
+  // duas vezes em Configuracoes. A logo e desejavel, mas nao impede a emissao.
+  const dadosFaltando = ([
+    [!(clinic.address ?? "").trim(), "o endereco"],
+    [!(clinic.phone ?? "").trim(), "o telefone"],
+  ] as const)
+    .filter(([falta]) => falta)
+    .map(([, rotulo]) => rotulo);
+  const faltaCadastro = dadosFaltando.length > 0;
+  const listaFaltando = dadosFaltando.join(" e ");
   const faltaLogo = !(clinic.logoUrl ?? "").trim();
 
   function pdf() {
     // Receita sem identificacao da clinica nao serve como documento: o endereco
     // e obrigatorio no cabecalho. Bloqueia aqui e diz onde resolver, em vez de
     // emitir um PDF incompleto que o tutor so vai descobrir na farmacia.
-    if (faltaEndereco) {
+    if (faltaCadastro) {
       setMsg(
-        "Cadastre o endereco da clinica em Configuracoes > Identidade da clinica para gerar a receita. " +
-          "Ele aparece no cabecalho do documento."
+        `Cadastre ${listaFaltando} da clinica em Configuracoes > Identidade da clinica para gerar a ` +
+          "receita. Esses dados aparecem no cabecalho do documento."
       );
       return;
     }
@@ -111,13 +121,14 @@ export function MedicalRecordForm({ appointmentId, initial, clinic, pet, tutor, 
         </div>
       </div>
 
-      {(faltaEndereco || faltaLogo) && (
-        <div className={`text-sm rounded-xl px-3 py-2 border ${faltaEndereco ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-slate-50 border-slate-200 text-slate-600"}`}>
-          {faltaEndereco ? (
+      {(faltaCadastro || faltaLogo) && (
+        <div className={`text-sm rounded-xl px-3 py-2 border ${faltaCadastro ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-slate-50 border-slate-200 text-slate-600"}`}>
+          {faltaCadastro ? (
             <>
-              <strong>Falta o endereco da clinica para emitir receita.</strong> Ele entra no cabecalho do
-              documento. Preencha em{" "}
+              <strong>Falta {listaFaltando} da clinica para emitir receita.</strong> Esses dados entram no
+              cabecalho do documento. Preencha em{" "}
               <a href="/configuracoes" className="underline font-medium">Configuracoes &gt; Identidade da clinica</a>.
+              {faltaLogo ? " Aproveite e envie a logo por la." : null}
             </>
           ) : (
             <>
@@ -129,14 +140,14 @@ export function MedicalRecordForm({ appointmentId, initial, clinic, pet, tutor, 
         </div>
       )}
 
-      {msg && <div className={`text-sm ${faltaEndereco ? "text-amber-700" : "text-emerald-700"}`}>{msg}</div>}
+      {msg && <div className={`text-sm ${faltaCadastro ? "text-amber-700" : "text-emerald-700"}`}>{msg}</div>}
       <div className="flex gap-2">
         <button onClick={save} disabled={saving} className="btn-primary">{saving ? "Salvando..." : "Salvar ficha"}</button>
         <button
           onClick={pdf}
           type="button"
           className="btn-outline"
-          title={faltaEndereco ? "Cadastre o endereco da clinica para liberar a receita" : undefined}
+          title={faltaCadastro ? `Cadastre ${listaFaltando} da clinica para liberar a receita` : undefined}
         >
           Gerar receita (PDF)
         </button>
