@@ -108,4 +108,14 @@ if (process.argv.includes("--pdf")) {
   console.log("receita-exemplo.pdf gravada");
 }
 
+// Formatacao do cabecalho: o cadastro guarda so digitos, o papel precisa pontuado.
+import { formatarTelefone, formatarCep, formatarCnpj } from "../src/lib/receita-pdf";
+assert.strictEqual(formatarTelefone("21981861038"), "(21) 98186-1038", "celular com DDD");
+assert.strictEqual(formatarTelefone("2132631032"), "(21) 3263-1032", "fixo com DDD");
+assert.strictEqual(formatarCep("23040150"), "23040-150", "CEP");
+assert.strictEqual(formatarCnpj("58153569000177"), "58.153.569/0001-77", "CNPJ");
+// valor fora do padrao nao pode ser mutilado
+assert.strictEqual(formatarTelefone("123"), "123", "telefone curto sai intacto");
+assert.strictEqual(formatarCep(""), "", "vazio continua vazio");
+
 console.log("OK - receita-pdf");

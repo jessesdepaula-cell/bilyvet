@@ -116,8 +116,39 @@ function pesoExtenso(w?: number | string | null) {
 
 function linhaCidade(c: ReceitaClinica) {
   const cidadeUf = [c.city, c.state].filter(Boolean).join("/");
-  const cep = c.zipCode ? "CEP: " + c.zipCode : "";
+  const cep = c.zipCode ? "CEP: " + formatarCep(c.zipCode) : "";
   return [cidadeUf, cep].filter(Boolean).join(" - ");
+}
+
+/**
+ * O cadastro guarda telefone, CEP e CNPJ so com digitos. No papel timbrado eles
+ * precisam sair pontuados, como no modelo da clinica: "(21) 98186-1032",
+ * "CEP: 23040-150", "58.153.569/0001-77". Se vier num tamanho inesperado,
+ * devolve o valor original em vez de mutilar o numero.
+ */
+function soDigitos(v?: string | null): string {
+  return (v ?? "").replace(/\D/g, "");
+}
+
+export function formatarTelefone(v?: string | null): string {
+  const d = soDigitos(v);
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  if (d.length === 9) return `${d.slice(0, 5)}-${d.slice(5)}`;
+  if (d.length === 8) return `${d.slice(0, 4)}-${d.slice(4)}`;
+  return (v ?? "").trim();
+}
+
+export function formatarCep(v?: string | null): string {
+  const d = soDigitos(v);
+  return d.length === 8 ? `${d.slice(0, 5)}-${d.slice(5)}` : (v ?? "").trim();
+}
+
+export function formatarCnpj(v?: string | null): string {
+  const d = soDigitos(v);
+  return d.length === 14
+    ? `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`
+    : (v ?? "").trim();
 }
 
 /** Cabecalho da clinica (logo + nome + endereco) + titulo "Receita". */
@@ -144,7 +175,7 @@ function drawClinicHeader(doc: jsPDF, c: ReceitaClinica) {
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
-  const linhas = [c.address, linhaCidade(c), c.phone, c.cnpj ? "CNPJ: " + c.cnpj : ""]
+  const linhas = [c.address, linhaCidade(c), formatarTelefone(c.phone), c.cnpj ? "CNPJ: " + formatarCnpj(c.cnpj) : ""]
     .map((l) => (l || "").trim())
     .filter(Boolean);
   for (const l of linhas) {
