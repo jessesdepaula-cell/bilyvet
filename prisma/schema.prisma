@@ -487,6 +487,9 @@ model MedicalRecord {
   conduct         String?
   procedures      String?
   observations    String?
+  prescriptionText String?
+  signerName      String?
+  signerCrmv      String?
   recommendReturn DateTime?
   createdAt       DateTime    @default(now())
 

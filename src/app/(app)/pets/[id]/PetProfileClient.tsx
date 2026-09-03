@@ -823,7 +823,7 @@ export function PetProfileClient({ pet: initialPet, tutors, protocolTemplates, s
                               <Calendar className="h-3 w-3" /> {fmtDateTime(m.createdAt)}
                             </span>
                             <span className="flex items-center gap-1 font-medium text-brand-600">
-                              <User className="h-3 w-3" /> Vet: {m.vet.name}
+                              <User className="h-3 w-3" /> Vet: {m.signerName || m.vet?.name || "Veterinário"}{m.signerCrmv ? ` (${m.signerCrmv})` : ""}
                             </span>
                           </div>
                           {m.complaint && (
@@ -851,17 +851,21 @@ export function PetProfileClient({ pet: initialPet, tutors, protocolTemplates, s
                               <b className="text-slate-800">Conduta:</b> {m.conduct}
                             </div>
                           )}
-                          {m.prescriptions.length > 0 && (
+                          {(m.prescriptionText || (m.prescriptions && m.prescriptions.length > 0)) && (
                             <div className="bg-brand-50/50 p-3 rounded-lg border border-brand-100 mt-2">
-                              <b className="text-xs text-brand-800 block mb-1">Receita Medica:</b>
-                              <ul className="text-xs space-y-1 text-slate-700 list-disc list-inside">
-                                {m.prescriptions.map((r: any) => (
-                                  <li key={r.id}>
-                                    <strong className="text-slate-800">{r.medication}</strong> • {r.dosage} • {r.frequency} ({r.duration})
-                                    {r.guidelines && <span className="text-slate-500 block pl-4">Obs: {r.guidelines}</span>}
-                                  </li>
-                                ))}
-                              </ul>
+                              <b className="text-xs text-brand-800 block mb-1">Receita Médica:</b>
+                              {m.prescriptionText ? (
+                                <p className="text-xs text-slate-700 whitespace-pre-line leading-relaxed">{m.prescriptionText}</p>
+                              ) : (
+                                <ul className="text-xs space-y-1 text-slate-700 list-disc list-inside">
+                                  {m.prescriptions.map((r: any) => (
+                                    <li key={r.id}>
+                                      <strong className="text-slate-800">{r.medication}</strong> • {r.dosage} • {r.frequency} ({r.duration})
+                                      {r.guidelines && <span className="text-slate-500 block pl-4">Obs: {r.guidelines}</span>}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
                             </div>
                           )}
                         </div>

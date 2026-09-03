@@ -38,14 +38,15 @@ export type ReceitaItem = {
   guidelines?: string | null;
 };
 
-export type ReceitaVet = { name: string; crmv?: string | null };
+export type ReceitaVet = { name?: string | null; crmv?: string | null };
 
 export type ReceitaInput = {
   clinic: ReceitaClinica;
   pet: ReceitaPaciente;
   tutor: ReceitaTutor;
   vet: ReceitaVet;
-  items: ReceitaItem[];
+  items?: ReceitaItem[];
+  prescriptionText?: string | null;
   printedBy: string;
   weightKg?: number | string | null;   // peso aferido na consulta (tem prioridade sobre o do cadastro)
   observations?: string | null;
@@ -273,63 +274,97 @@ export function montarReceitaPDF(input: ReceitaInput): jsPDF {
     y = HEADER_INFO_Y + 8;
   };
 
-  const usados = items.filter((i) => (i.medication || "").trim());
+  const rawPrescription = (input.prescriptionText || "").trim();
 
-  usados.forEach((item, idx) => {
-    ensure(16);
+  if (rawPrescription) {
+    const lines = rawPrescription.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const raw = lines[i];
+      const trimmed = raw.trim();
+      if (!trimmed) {
+        y += 3;
+        continue;
+      }
 
-    const titulo = idx + 1 + ") " + item.medication.trim();
-    const dose = (item.dosage || "").trim();
+      // Se a linha começar com número ou marcador (ex: "1)", "1.", "1 -", "•", "-", "*")
+      const isItemHeader = /^(?:\d+[\.\)\-]|[•\-\*])\s+/.test(trimmed);
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9.5);
-    doc.text(titulo, M, y);
-    const tituloW = doc.getTextWidth(titulo);
+      ensure(7);
+      if (isItemHeader) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9.5);
+      } else {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+      }
 
-    // "____ uso veterinário ____" preenchendo o vao entre o nome e a dose
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    const usoTxt = " uso veterinário ";
-    const usoW = doc.getTextWidth(usoTxt);
-    const doseW = dose ? doc.getTextWidth(dose) + 2 : 0;
-    const livre = RIGHT - (M + tituloW) - doseW - usoW;
-    if (livre > 4) {
-      const tracoW = doc.getTextWidth("_");
-      const fill = "_".repeat(Math.max(1, Math.floor(livre / 2 / tracoW)));
-      const fillW = doc.getTextWidth(fill);
-      doc.setTextColor(130);
-      doc.text(fill, M + tituloW, y);
-      doc.setTextColor(0);
-      doc.text(usoTxt, M + tituloW + fillW, y);
-      doc.setTextColor(130);
-      doc.text(fill, M + tituloW + fillW + usoW, y);
-      doc.setTextColor(0);
-    } else {
-      doc.setTextColor(130);
-      doc.text(usoTxt, M + tituloW, y);
-      doc.setTextColor(0);
-    }
-    if (dose) {
-      doc.setFont("helvetica", "bold");
-      doc.text(dose, RIGHT, y, { align: "right" });
-    }
-    y += 5;
-
-    // Posologia: frequencia + duracao + orientacoes do item
-    const posologia = [item.frequency, item.duration].map((v) => (v || "").trim()).filter(Boolean).join(", ");
-    const corpo = [posologia, (item.guidelines || "").trim()].filter(Boolean).join(". ");
-    if (corpo) {
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      const lines: string[] = doc.splitTextToSize(corpo, RIGHT - M);
-      for (const l of lines) {
-        ensure(6);
-        doc.text(l, M, y);
-        y += 4.4;
+      const wrapped: string[] = doc.splitTextToSize(raw, RIGHT - M);
+      for (const wLine of wrapped) {
+        ensure(5.5);
+        doc.text(wLine, M, y);
+        y += 4.5;
       }
     }
-    y += 3.5;
-  });
+    y += 4;
+  } else if (items && items.length > 0) {
+    const usados = items.filter((i) => (i.medication || "").trim());
+
+    usados.forEach((item, idx) => {
+      ensure(16);
+
+      const titulo = idx + 1 + ") " + item.medication.trim();
+      const dose = (item.dosage || "").trim();
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9.5);
+      doc.text(titulo, M, y);
+      const tituloW = doc.getTextWidth(titulo);
+
+      // "____ uso veterinário ____" preenchendo o vao entre o nome e a dose
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      const usoTxt = " uso veterinário ";
+      const usoW = doc.getTextWidth(usoTxt);
+      const doseW = dose ? doc.getTextWidth(dose) + 2 : 0;
+      const livre = RIGHT - (M + tituloW) - doseW - usoW;
+      if (livre > 4) {
+        const tracoW = doc.getTextWidth("_");
+        const fill = "_".repeat(Math.max(1, Math.floor(livre / 2 / tracoW)));
+        const fillW = doc.getTextWidth(fill);
+        doc.setTextColor(130);
+        doc.text(fill, M + tituloW, y);
+        doc.setTextColor(0);
+        doc.text(usoTxt, M + tituloW + fillW, y);
+        doc.setTextColor(130);
+        doc.text(fill, M + tituloW + fillW + usoW, y);
+        doc.setTextColor(0);
+      } else {
+        doc.setTextColor(130);
+        doc.text(usoTxt, M + tituloW, y);
+        doc.setTextColor(0);
+      }
+      if (dose) {
+        doc.setFont("helvetica", "bold");
+        doc.text(dose, RIGHT, y, { align: "right" });
+      }
+      y += 5;
+
+      // Posologia: frequencia + duracao + orientacoes do item
+      const posologia = [item.frequency, item.duration].map((v) => (v || "").trim()).filter(Boolean).join(", ");
+      const corpo = [posologia, (item.guidelines || "").trim()].filter(Boolean).join(". ");
+      if (corpo) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        const lines: string[] = doc.splitTextToSize(corpo, RIGHT - M);
+        for (const l of lines) {
+          ensure(6);
+          doc.text(l, M, y);
+          y += 4.4;
+        }
+      }
+      y += 3.5;
+    });
+  }
 
   // Orientacoes gerais (texto livre da ficha)
   const obs = (input.observations || "").trim();
@@ -383,13 +418,24 @@ export function montarReceitaPDF(input: ReceitaInput): jsPDF {
   doc.setLineWidth(0.3);
   doc.line(cx - 35, y, cx + 35, y);
   y += 4.5;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9.5);
-  doc.text(s(vet.name), cx, y, { align: "center" });
-  y += 4.5;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.text(vet.crmv ? "CRMV: " + vet.crmv : "Médico(a) Veterinário(a)", cx, y, { align: "center" });
+
+  const vetNome = (vet.name || "").trim();
+  const vetCrmv = (vet.crmv || "").trim();
+
+  if (vetNome) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9.5);
+    doc.text(vetNome, cx, y, { align: "center" });
+    y += 4.5;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.text(vetCrmv ? "CRMV: " + vetCrmv : "Médico(a) Veterinário(a)", cx, y, { align: "center" });
+  } else {
+    // Quando não preenchido: deixa o espaço limpo para carimbo e assinatura física
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.text(vetCrmv ? "CRMV: " + vetCrmv : "Médico(a) Veterinário(a)", cx, y, { align: "center" });
+  }
 
   // ==== Carimbo "Pag. x / y" em todas as paginas ====
   const total = doc.getNumberOfPages();

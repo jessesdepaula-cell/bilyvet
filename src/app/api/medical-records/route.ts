@@ -33,7 +33,11 @@ export async function POST(req: Request) {
         complaint: b.complaint, anamnesis: b.anamnesis, physicalExam: b.physicalExam,
         weightKg: hasValidWeight ? weightKg : existing.weightKg,
         diagnosis: b.diagnosis, conduct: b.conduct, procedures: b.procedures,
-        observations: b.observations, recommendReturn: b.recommendReturn ? new Date(b.recommendReturn) : null,
+        observations: b.observations,
+        prescriptionText: b.prescriptionText !== undefined ? (b.prescriptionText || null) : existing.prescriptionText,
+        signerName: b.signerName !== undefined ? (b.signerName?.trim() || null) : existing.signerName,
+        signerCrmv: b.signerCrmv !== undefined ? (b.signerCrmv?.trim() || null) : existing.signerCrmv,
+        recommendReturn: b.recommendReturn ? new Date(b.recommendReturn) : null,
       },
     });
     if (Array.isArray(b.prescriptions)) {
@@ -49,7 +53,11 @@ export async function POST(req: Request) {
       complaint: b.complaint, anamnesis: b.anamnesis, physicalExam: b.physicalExam,
       weightKg: hasValidWeight ? weightKg : null,
       diagnosis: b.diagnosis, conduct: b.conduct, procedures: b.procedures,
-      observations: b.observations, recommendReturn: b.recommendReturn ? new Date(b.recommendReturn) : null,
+      observations: b.observations,
+      prescriptionText: b.prescriptionText || null,
+      signerName: b.signerName?.trim() || null,
+      signerCrmv: b.signerCrmv?.trim() || null,
+      recommendReturn: b.recommendReturn ? new Date(b.recommendReturn) : null,
       prescriptions: { create: (b.prescriptions ?? []).filter((p: any) => p.medication) },
     },
   });

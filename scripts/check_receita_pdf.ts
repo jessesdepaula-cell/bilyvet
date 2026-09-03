@@ -88,6 +88,33 @@ const texto = Buffer.from(um.output("arraybuffer")).toString("latin1");
 assert.ok(texto.includes("Retornar em 11/08/2026"), "retorno nao pode escorregar um dia");
 assert.ok(texto.includes("Belinha") && texto.includes("VETZ"), "paciente e clinica no PDF");
 
+// ---- NOVO: receita com texto livre (espaco unico e amplo) ----
+const comTextoLivre = montarReceitaPDF({
+  ...base,
+  prescriptionText: `1) Amoxicilina + Clavulanato 250mg
+   Administrar 1 comprimido a cada 12 horas por 10 dias.
+   Orientacao: Sempre fornecer apos alimentacao.
+
+2) Meloxicam 0,5mg
+   Administrar 1 comprimido ao dia por 3 dias.`,
+  vet: { name: "", crmv: "" }, // sem nome preenchido: deixa linha limpa para carimbo
+});
+const txtLivre = Buffer.from(comTextoLivre.output("arraybuffer")).toString("latin1");
+assert.ok(txtLivre.includes("Amoxicilina"), "medicamento em texto livre presente no PDF");
+assert.ok(txtLivre.includes("Meloxicam"), "segundo medicamento presente no PDF");
+assert.ok(!txtLivre.includes("\n-\n"), "assinatura sem nome nao imprime tracinho solitario");
+
+// ---- NOVO: veterinario especialista volante que acessa com a conta da clinica ----
+const comEspecialista = montarReceitaPDF({
+  ...base,
+  prescriptionText: "1) Colirio Tobramicina - 1 gota em ambos os olhos a cada 8h por 7 dias.",
+  vet: { name: "Dr. Marcelo Oftalmologista", crmv: "SP 99.888" },
+});
+const txtEsp = Buffer.from(comEspecialista.output("arraybuffer")).toString("latin1");
+assert.ok(txtEsp.includes("Dr. Marcelo Oftalmologista"), "nome do especialista volante sai na assinatura");
+assert.ok(txtEsp.includes("CRMV: SP 99.888"), "crmv do especialista volante sai na assinatura");
+
+
 if (process.argv.includes("--pdf")) {
   // amostra visual com logo, pra conferir o encaixe do cabecalho
   const logoDeTeste = existsSync("scripts/.logo-teste.txt")

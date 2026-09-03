@@ -4,14 +4,16 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { gerarReceitaPDF, type ReceitaClinica, type ReceitaPaciente, type ReceitaTutor, type ReceitaVet } from "@/lib/receita-pdf";
 
-type Prescription = { medication: string; dosage: string; frequency: string; duration: string; guidelines?: string | null };
 type MR = {
   id?: string;
   complaint?: string | null; anamnesis?: string | null; physicalExam?: string | null;
   weightKg?: number | string | null;
   diagnosis?: string | null; conduct?: string | null; procedures?: string | null;
   observations?: string | null; recommendReturn?: Date | string | null;
-  prescriptions?: Prescription[];
+  prescriptionText?: string | null;
+  signerName?: string | null;
+  signerCrmv?: string | null;
+  prescriptions?: any[];
 };
 
 type Props = {
@@ -24,23 +26,51 @@ type Props = {
   printedBy: string;
 };
 
+function parseInitialPrescription(initial: any): string {
+  if (initial?.prescriptionText) return initial.prescriptionText;
+  if (Array.isArray(initial?.prescriptions) && initial.prescriptions.length > 0) {
+    return initial.prescriptions
+      .map((r: any, idx: number) => {
+        const title = `${idx + 1}) ${r.medication || ""}`.trim();
+        const details = [r.dosage, r.frequency, r.duration].filter(Boolean).join(" - ");
+        const parts = [title];
+        if (details) parts.push(`   ${details}`);
+        if (r.guidelines) parts.push(`   Obs: ${r.guidelines}`);
+        return parts.join("\n");
+      })
+      .join("\n\n");
+  }
+  return "";
+}
+
 export function MedicalRecordForm({ appointmentId, initial, clinic, pet, tutor, vet, printedBy }: Props) {
   const router = useRouter();
   const [m, setM] = useState<MR>(initial ?? {});
-  const [rx, setRx] = useState<Prescription[]>(initial?.prescriptions ?? [{ medication: "", dosage: "", frequency: "", duration: "" }]);
+  const [prescriptionText, setPrescriptionText] = useState<string>(() => parseInitialPrescription(initial));
+  // Inicia sem o nome já preenchido por padrão, permitindo que especialistas volantes
+  // coloquem seu próprio nome/CRMV ou que a receita saia com linha limpa para carimbo físico.
+  const [signerName, setSignerName] = useState<string>(initial?.signerName ?? "");
+  const [signerCrmv, setSignerCrmv] = useState<string>(initial?.signerCrmv ?? "");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   function u<K extends keyof MR>(k: K, v: any) { setM((p) => ({ ...p, [k]: v })); }
-  function updateRx(i: number, k: keyof Prescription, v: string) { setRx((p) => p.map((r, idx) => idx === i ? { ...r, [k]: v } : r)); }
-  function addRx() { setRx((p) => [...p, { medication: "", dosage: "", frequency: "", duration: "" }]); }
-  function delRx(i: number) { setRx((p) => p.filter((_, idx) => idx !== i)); }
 
   async function save() {
     setSaving(true); setMsg(null);
     try {
-      const body = { appointmentId, ...m, prescriptions: rx.filter((r) => r.medication.trim()) };
-      const res = await fetch("/api/medical-records", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const body = {
+        appointmentId,
+        ...m,
+        prescriptionText: prescriptionText.trim() || null,
+        signerName: signerName.trim() || null,
+        signerCrmv: signerCrmv.trim() || null,
+      };
+      const res = await fetch("/api/medical-records", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
       if (!res.ok) throw new Error("Falha ao salvar");
       setMsg("Ficha salva com sucesso");
       router.refresh();
@@ -71,15 +101,22 @@ export function MedicalRecordForm({ appointmentId, initial, clinic, pet, tutor, 
       );
       return;
     }
-    const itens = rx.filter((r) => r.medication.trim());
-    if (itens.length === 0) { setMsg("Adicione ao menos um medicamento antes de gerar a receita."); return; }
+    const textoReceita = prescriptionText.trim();
+    if (!textoReceita) {
+      setMsg("Digite ao menos uma medicação no campo de receituário antes de gerar a receita.");
+      return;
+    }
     gerarReceitaPDF({
       clinic,
       pet: pet ?? { name: "-" },
       tutor,
-      vet,
+      vet: {
+        name: signerName.trim() || null,
+        crmv: signerCrmv.trim() || null,
+      },
       printedBy,
-      items: itens,
+      prescriptionText: textoReceita,
+      items: [],
       weightKg: m.weightKg ?? null,
       // Conduta e observacoes viram o bloco de orientacoes gerais da receita
       observations: [m.conduct, m.observations].map((v) => (v || "").trim()).filter(Boolean).join("\n"),
@@ -102,22 +139,75 @@ export function MedicalRecordForm({ appointmentId, initial, clinic, pet, tutor, 
         <div><label className="label">Retorno recomendado</label><input className="input" type="date" value={m.recommendReturn ? new Date(m.recommendReturn).toISOString().slice(0,10) : ""} onChange={(e) => u("recommendReturn", e.target.value)} /></div>
       </div>
 
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-medium">Receituario interno</h3>
-          <button className="btn-outline text-xs" onClick={addRx} type="button">+ medicamento</button>
+      {/* Espaço Único e Amplo para Medicações */}
+      <div className="border-t border-slate-100 pt-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-medium text-slate-800">Prescrição e Medicações (Receituário)</h3>
+            <p className="text-xs text-slate-500">
+              Digite todas as medicações, posologias e orientações livremente. O texto sairá formatado na receita em PDF.
+            </p>
+          </div>
         </div>
-        <div className="space-y-2">
-          {rx.map((r, i) => (
-            <div key={i} className="grid grid-cols-12 gap-2">
-              <input className="input col-span-3" placeholder="Medicamento" value={r.medication} onChange={(e) => updateRx(i, "medication", e.target.value)} />
-              <input className="input col-span-2" placeholder="Dosagem" value={r.dosage} onChange={(e) => updateRx(i, "dosage", e.target.value)} />
-              <input className="input col-span-2" placeholder="Frequencia" value={r.frequency} onChange={(e) => updateRx(i, "frequency", e.target.value)} />
-              <input className="input col-span-2" placeholder="Duracao" value={r.duration} onChange={(e) => updateRx(i, "duration", e.target.value)} />
-              <input className="input col-span-2" placeholder="Orientacoes" value={r.guidelines ?? ""} onChange={(e) => updateRx(i, "guidelines", e.target.value)} />
-              <button type="button" onClick={() => delRx(i)} className="btn-ghost text-red-600 col-span-1">x</button>
+
+        <div>
+          <textarea
+            className="input w-full font-sans text-sm leading-relaxed"
+            rows={8}
+            placeholder={`Digite as medicações e posologias aqui sem restrição. Exemplo:\n\n1) Amoxicilina + Clavulanato 250mg\n   Administrar 1 comprimido a cada 12 horas por 10 dias via oral.\n\n2) Meloxicam 0,5mg\n   Administrar 1 comprimido a cada 24 horas por 3 dias junto à alimentação.`}
+            value={prescriptionText}
+            onChange={(e) => setPrescriptionText(e.target.value)}
+          />
+        </div>
+
+        {/* Bloco de Assinatura da Receita */}
+        <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-xs font-semibold text-slate-800 block">Assinatura da Receita</span>
+              <span className="text-[11px] text-slate-500">
+                Insira o nome e CRMV de quem assina (útil para veterinários especialistas/volantes), ou deixe em branco para carimbar à mão.
+              </span>
             </div>
-          ))}
+            {vet?.name && (
+              <button
+                type="button"
+                className="text-[11px] text-brand-600 hover:text-brand-800 underline font-medium"
+                onClick={() => {
+                  if (signerName || signerCrmv) {
+                    setSignerName("");
+                    setSignerCrmv("");
+                  } else {
+                    setSignerName(vet.name || "");
+                    setSignerCrmv(vet.crmv || "");
+                  }
+                }}
+              >
+                {signerName || signerCrmv ? "Limpar assinatura" : `Preencher com meus dados (${vet.name})`}
+              </button>
+            )}
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-3 pt-1">
+            <div>
+              <label className="label text-xs">Nome do(a) Veterinário(a)</label>
+              <input
+                className="input text-sm"
+                placeholder="Ex: Dr. Carlos Silva (ou deixe em branco)"
+                value={signerName}
+                onChange={(e) => setSignerName(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="label text-xs">CRMV</label>
+              <input
+                className="input text-sm"
+                placeholder="Ex: RJ 17.412"
+                value={signerCrmv}
+                onChange={(e) => setSignerCrmv(e.target.value)}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
