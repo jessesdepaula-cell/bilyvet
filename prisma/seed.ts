@@ -13,9 +13,13 @@ async function ensureSuperAdmin() {
   const email = process.env.SUPER_ADMIN_EMAIL;
   const senha = process.env.SUPER_ADMIN_PASSWORD;
   if (!email || !senha) {
-    throw new Error(
-      "Defina SUPER_ADMIN_EMAIL e SUPER_ADMIN_PASSWORD para semear o super admin."
-    );
+    const existingSuperAdmin = await prisma.user.findFirst({ where: { role: "SUPER_ADMIN" } });
+    if (existingSuperAdmin) {
+      console.log("Super admin ja cadastrado no banco de dados. Pulando seed.");
+      return;
+    }
+    console.warn("Aviso: Defina SUPER_ADMIN_EMAIL e SUPER_ADMIN_PASSWORD no ambiente para semear o super admin.");
+    return;
   }
   const existing = await prisma.user.findUnique({ where: { email } });
   const passwordHash = bcrypt.hashSync(senha, 10);
