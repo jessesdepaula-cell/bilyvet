@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { isSuperAdmin } from "@/lib/permissions";
-import { asaasIsConfigured, getSubscription, listSubscriptionPayments, updateSubscription, nextDueDateFromPayment } from "@/lib/asaas";
+import { asaasIsConfigured, getSubscription, listSubscriptionPayments } from "@/lib/asaas";
 
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
   const s = await getSession();
@@ -58,31 +58,11 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
         });
       }
 
-      // Regra: proximo vencimento = 1 mes apos o ultimo pagamento efetivado.
-      // Corrige assinaturas cujo nextDueDate ainda segue o ciclo antigo (dia fixo).
-      const paidPayments = data
-        .filter((p) => p.paymentDate && ["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"].includes((p.status || "").toUpperCase()))
-        .sort((a, b) => new Date(b.paymentDate!).getTime() - new Date(a.paymentDate!).getTime());
-      const lastPaid = paidPayments[0];
-      if (lastPaid?.paymentDate) {
-        const newDueDate = nextDueDateFromPayment(new Date(lastPaid.paymentDate));
-        // IDEMPOTENCIA: so mexe no Asaas se a data mudou de verdade. Com
-        // updatePendingPayments o Asaas GERA uma cobranca nova em vez de mover a
-        // existente, entao chamar isso a cada sync duplicava a mensalidade do
-        // cliente - uma cobranca extra por execucao (aconteceu na VETZ em 26/08/2026,
-        // 2 cobrancas para 04/09 e 2 para 04/10).
-        if (remote.nextDueDate !== newDueDate) {
-          try {
-            await updateSubscription(sub.asaasSubscriptionId, { nextDueDate: newDueDate, updatePendingPayments: true });
-          } catch {
-            // se o Asaas recusar, mantem ao menos o valor local coerente
-          }
-        }
-        await prisma.subscription.update({
-          where: { id: sub.id },
-          data: { nextDueDate: new Date(`${newDueDate}T00:00:00.000Z`) },
-        });
-      }
+      // O dia do vencimento e ancorado pelo ciclo MONTHLY do Asaas e ja foi
+      // espelhado acima (`remote.nextDueDate`). Este sync e SO LEITURA sobre a
+      // assinatura: nao reagenda, nao chama updateSubscription. A versao anterior
+      // recalculava a data a partir do ultimo pagamento e, a cada execucao,
+      // duplicava a mensalidade do cliente. Ver src/app/api/asaas/webhook/route.ts.
       updated++;
     } catch (e: any) {
       // segue para a proxima

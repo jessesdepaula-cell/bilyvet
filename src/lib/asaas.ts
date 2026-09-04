@@ -144,39 +144,8 @@ export async function getSubscription(id: string): Promise<AsaasSubscription> {
   return asaasFetch<AsaasSubscription>(`/subscriptions/${id}`);
 }
 
-export async function updateSubscription(
-  id: string,
-  input: { nextDueDate?: string; value?: number; updatePendingPayments?: boolean }
-): Promise<AsaasSubscription> {
-  return asaasFetch<AsaasSubscription>(`/subscriptions/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(input),
-  });
-}
-
 export async function getPixQrCode(paymentId: string): Promise<AsaasPixQrCode> {
   return asaasFetch<AsaasPixQrCode>(`/payments/${paymentId}/pixQrCode`);
-}
-
-/**
- * Regra de cobranca do BilyVet: o proximo vencimento e sempre 1 mes (mesmo dia)
- * apos a data do ultimo pagamento. Ex.: pagou 05/06 -> proxima cobranca 05/07.
- * Retorna a data no formato YYYY-MM-DD esperado pelo Asaas. Faz clamp quando o
- * dia nao existe no mes seguinte (ex.: 31/01 -> 28/02).
- */
-export function nextDueDateFromPayment(paidAt: Date): string {
-  const year = paidAt.getUTCFullYear();
-  const month = paidAt.getUTCMonth();
-  const day = paidAt.getUTCDate();
-  const target = new Date(Date.UTC(year, month + 1, day));
-  // Se estourou para o mes seguinte (dia inexistente), volta pro ultimo dia do mes alvo
-  if (target.getUTCMonth() !== (month + 1) % 12) {
-    target.setUTCDate(0);
-  }
-  const y = target.getUTCFullYear();
-  const m = String(target.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(target.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
 }
 
 export async function cancelSubscription(id: string): Promise<AsaasSubscription> {

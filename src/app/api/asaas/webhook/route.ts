@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { asaasIsConfigured, updateSubscription, nextDueDateFromPayment } from "@/lib/asaas";
+import { asaasIsConfigured, getSubscription } from "@/lib/asaas";
 
 // Webhook do Asaas - recebe eventos de pagamento/assinatura.
 // Configure em https://www.asaas.com/customerWebhook
@@ -83,33 +83,31 @@ export async function POST(req: Request) {
           await prisma.tenant.update({ where: { id: tenant.id }, data: { status: "ACTIVE" } });
           if (sub) await prisma.subscription.update({ where: { id: sub.id }, data: { status: "ACTIVE" } });
 
-          // Regra: proximo vencimento = 1 mes apos a data do pagamento.
-          // Reagenda a assinatura no Asaas (movendo a fatura pendente) e localmente.
-          const paidAt = payment.paymentDate ? new Date(payment.paymentDate) : null;
-          if (sub && sub.asaasSubscriptionId && paidAt && !Number.isNaN(paidAt.getTime())) {
-            const newDueDate = nextDueDateFromPayment(paidAt);
-            // IDEMPOTENCIA: o Asaas reenvia evento (retry, reprocessamento), e com
-            // updatePendingPayments ele GERA cobranca nova em vez de mover a
-            // existente. Sem esta guarda, cada reenvio duplicaria a mensalidade.
-            const dueDateLocal = sub.nextDueDate
-              ? sub.nextDueDate.toISOString().slice(0, 10)
-              : null;
+          // O DIA DO VENCIMENTO NAO MUDA quando o cliente paga atrasado: a VETZ
+          // vence dia 4, tendo pago no dia 4 ou no dia 5. Quem mantem esse
+          // ancoramento e o proprio ciclo MONTHLY do Asaas, que gera 04/10, 04/11...
+          //
+          // A versao anterior calculava "1 mes apos a DATA DO PAGAMENTO" e reagendava
+          // a assinatura no Asaas. Isso arrastava o vencimento (pagou 05/09 -> passava
+          // a vencer 05/10) e, com `updatePendingPayments`, o Asaas GERAVA cobranca
+          // nova em vez de mover a existente - foi assim que a VETZ ficou com 2
+          // cobrancas para 04/09 e 2 para 04/10 em agosto de 2026.
+          //
+          // Aqui so espelhamos o que o Asaas decidiu. Nunca reagendar a partir daqui.
+          if (sub && sub.asaasSubscriptionId && asaasIsConfigured()) {
             try {
-              if (asaasIsConfigured() && dueDateLocal !== newDueDate) {
-                await updateSubscription(sub.asaasSubscriptionId, {
-                  nextDueDate: newDueDate,
-                  updatePendingPayments: true,
+              const remota = await getSubscription(sub.asaasSubscriptionId);
+              if (remota.nextDueDate) {
+                await prisma.subscription.update({
+                  where: { id: sub.id },
+                  data: { nextDueDate: new Date(`${remota.nextDueDate}T00:00:00.000Z`) },
                 });
               }
-              await prisma.subscription.update({
-                where: { id: sub.id },
-                data: { nextDueDate: new Date(`${newDueDate}T00:00:00.000Z`) },
-              });
             } catch (reErr: any) {
-              // Nao interrompe o processamento do pagamento se o reagendamento falhar
+              // Nao interrompe o processamento do pagamento se o espelhamento falhar
               await prisma.asaasWebhookEvent.update({
                 where: { id: evt.id },
-                data: { error: `reschedule falhou: ${String(reErr?.message || reErr)}` },
+                data: { error: `espelhar vencimento falhou: ${String(reErr?.message || reErr)}` },
               });
             }
           }
