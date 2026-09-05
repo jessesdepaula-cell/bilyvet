@@ -72,7 +72,7 @@ export function MedicalRecordForm({ appointmentId, initial, clinic, pet, tutor, 
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error("Falha ao salvar");
-      setMsg("Ficha salva com sucesso");
+      setMsg("Ficha salva com sucesso! As informações deste atendimento foram salvas e registradas no histórico do animal.");
       router.refresh();
     } catch (e: any) { setMsg(e.message); } finally { setSaving(false); }
   }
