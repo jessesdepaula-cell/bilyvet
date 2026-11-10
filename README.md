@@ -30,16 +30,7 @@ Abra http://localhost:3000
 
 ### Login
 
-| Usuário                     | Senha     | Perfil         |
-|-----------------------------|-----------|----------------|
-| admin@bilyvet.com          | admin123  | Administrador  |
-| gestor@bilyvet.com         | 123456    | Gestor         |
-| vet@bilyvet.com            | 123456    | Veterinário    |
-| recepcao@bilyvet.com       | 123456    | Recepção       |
-| financeiro@bilyvet.com     | 123456    | Financeiro     |
-| estoque@bilyvet.com        | 123456    | Estoque        |
-| banhotosa@bilyvet.com      | 123456    | Banho e Tosa   |
-| vendedor@bilyvet.com       | 123456    | Vendedor       |
+O comando `npm run db:reset` cria contas de demonstração para cada perfil (administrador, gestor, veterinário, recepção, financeiro, estoque, banho e tosa, vendedor). Veja os dados em `prisma/seed.ts`.
 
 ## Scripts
 
